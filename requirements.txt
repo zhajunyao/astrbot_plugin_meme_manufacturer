@@ -1,6 +1,6 @@
 Pillow
 pil-utils
-requests
+aiohttp
 numpy
 opencv-python-headless
 meme-generator
