@@ -55,13 +55,22 @@ def generate_saimin(image_path: str, output_path: str):
     except Exception as e:
         raise RuntimeError(f"动图生成出错: {e}") from e
 
+
 if __name__ == "__main__":
+    import traceback
+
     try:
+        # 这里进行你的参数长度判断
         if len(sys.argv) >= 3:
-            generate_saimin(sys.argv[1], sys.argv[2])
+            # 调用你的生成函数
+            generate_something(sys.argv[1], sys.argv[2])
             sys.exit(0)
         else:
+            print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)
             sys.exit(1)
+
     except Exception as e:
-        print(f"处理失败: {str(e)}", file=sys.stderr)
+        # 【关键】把包含代码行数的详细报错打到标准错误流中，主进程才好收集
+        err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
+        print(err_msg, file=sys.stderr)
         sys.exit(1)

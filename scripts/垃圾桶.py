@@ -37,19 +37,22 @@ def generate_trash(image_path: str, output_path: str): # 【修复】改名
     except Exception as e:
         raise RuntimeError(f"生成失败: {str(e)}") from e
 
+
 if __name__ == "__main__":
+    import traceback
+
     try:
+        # 这里进行你的参数长度判断
         if len(sys.argv) >= 3:
-            input_file = Path(sys.argv[1])
-            output_file = Path(sys.argv[2])
-            if not input_file.exists():
-                print(f"错误: 文件 {input_file} 不存在！", file=sys.stderr) # 【修复】暴露异常
-                sys.exit(1)
-            generate_trash(str(input_file), str(output_file))
+            # 调用你的生成函数
+            generate_something(sys.argv[1], sys.argv[2])
             sys.exit(0)
         else:
-            print("缺少参数！", file=sys.stderr)
+            print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)
             sys.exit(1)
+
     except Exception as e:
-        print(f"处理失败: {str(e)}", file=sys.stderr) # 【修复】抛出异常给主进程
+        # 【关键】把包含代码行数的详细报错打到标准错误流中，主进程才好收集
+        err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
+        print(err_msg, file=sys.stderr)
         sys.exit(1)

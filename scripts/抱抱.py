@@ -64,19 +64,20 @@ def generate_hug(user_path: str, self_path: str, output_path: str):
 
 
 if __name__ == "__main__":
-    try:
-        # 接收命令行传入的 3 个参数
-        if len(sys.argv) >= 4:
-            target_p = sys.argv[1]  # 对方头像
-            sender_p = sys.argv[2]  # 发送者头像
-            out_p = sys.argv[3]  # 输出文件路径
+    import traceback
 
-            generate_hug(target_p, sender_p, out_p)
+    try:
+        # 这里进行你的参数长度判断
+        if len(sys.argv) >= 3:
+            # 调用你的生成函数
+            generate_something(sys.argv[1], sys.argv[2])
             sys.exit(0)
         else:
-            print("缺少参数！", file=sys.stderr)
+            print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)
             sys.exit(1)
 
     except Exception as e:
-        print(f"执行错误: {str(e)}", file=sys.stderr)
+        # 【关键】把包含代码行数的详细报错打到标准错误流中，主进程才好收集
+        err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
+        print(err_msg, file=sys.stderr)
         sys.exit(1)

@@ -57,23 +57,20 @@ def generate_twist(image_path: str, output_path: str):
 
 
 if __name__ == "__main__":
+    import traceback
+
     try:
-        # 接收外部传入的两个参数：输入图片路径 和 输出GIF路径
+        # 这里进行你的参数长度判断
         if len(sys.argv) >= 3:
-            input_file = Path(sys.argv[1])
-            output_file = Path(sys.argv[2])
-
-            if not input_file.exists():
-                print(f"错误: 文件 {input_file} 不存在！", file=sys.stderr)
-                sys.exit(1)
-
-            generate_twist(str(input_file), str(output_file))
-            print(f"成功生成: {output_file}")
+            # 调用你的生成函数
+            generate_something(sys.argv[1], sys.argv[2])
             sys.exit(0)
         else:
-            print("缺少参数！", file=sys.stderr)
+            print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)
             sys.exit(1)
 
     except Exception as e:
-        print(f"处理失败: {str(e)}", file=sys.stderr)
+        # 【关键】把包含代码行数的详细报错打到标准错误流中，主进程才好收集
+        err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
+        print(err_msg, file=sys.stderr)
         sys.exit(1)

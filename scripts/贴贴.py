@@ -69,24 +69,20 @@ def generate_rub(self_path: str, target_path: str, output_path: str):
 
 
 if __name__ == "__main__":
+    import traceback
+
     try:
-        # 接收外部传入的三个参数：主动方图片，被动方图片，输出GIF路径
-        if len(sys.argv) >= 4:
-            self_file = Path(sys.argv[1])
-            target_file = Path(sys.argv[2])
-            output_file = Path(sys.argv[3])
-
-            if not self_file.exists() or not target_file.exists():
-                print("错误: 输入的图片文件不存在！", file=sys.stderr)
-                sys.exit(1)
-
-            generate_rub(str(self_file), str(target_file), str(output_file))
-            print(f"生成成功: {output_file}")
+        # 这里进行你的参数长度判断
+        if len(sys.argv) >= 3:
+            # 调用你的生成函数
+            generate_something(sys.argv[1], sys.argv[2])
             sys.exit(0)
         else:
-            print("缺少参数！", file=sys.stderr)
+            print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)
             sys.exit(1)
 
     except Exception as e:
-        print(f"处理失败: {str(e)}", file=sys.stderr)
+        # 【关键】把包含代码行数的详细报错打到标准错误流中，主进程才好收集
+        err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
+        print(err_msg, file=sys.stderr)
         sys.exit(1)

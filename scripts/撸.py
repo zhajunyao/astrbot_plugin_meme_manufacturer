@@ -75,26 +75,20 @@ def process_image(input_path, output_path, mode):
 
 
 if __name__ == "__main__":
+    import traceback
+
     try:
-        # 💡 核心修复：兼容 2 个参数的情况
+        # 这里进行你的参数长度判断
         if len(sys.argv) >= 3:
-            input_file = sys.argv[1]
-            output_file = sys.argv[2]
-            
-            # 💡 如果 main.py 传了模式就用，没传就默认 '1'（双手撸）
-            mode = sys.argv[3] if len(sys.argv) >= 4 else '1'
-
-            if not Path(input_file).exists():
-                print(f"错误: 文件 {input_file} 不存在！", file=sys.stderr)
-                sys.exit(1)
-
-            process_image(input_file, output_file, mode)
-            print(f"动图已生成: {output_file}")
+            # 调用你的生成函数
+            generate_something(sys.argv[1], sys.argv[2])
             sys.exit(0)
         else:
-            print("缺少参数！", file=sys.stderr)
+            print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)
             sys.exit(1)
 
     except Exception as e:
-        print(f"处理失败: {str(e)}", file=sys.stderr)
+        # 【关键】把包含代码行数的详细报错打到标准错误流中，主进程才好收集
+        err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
+        print(err_msg, file=sys.stderr)
         sys.exit(1)

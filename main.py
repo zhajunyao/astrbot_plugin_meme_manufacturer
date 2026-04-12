@@ -21,18 +21,33 @@ class MemeArsenal(Star):
         self.semaphore = asyncio.Semaphore(5)  # 限制最高并发数为5
 
     async def download_image(self, url: str, path: str):
-        """异步下载图片的辅助方法，加入基础防SSRF检查"""
+        """异步下载图片，内置反 SSRF 导弹防御系统与文件大小限制"""
         parsed = urlparse(url)
+
+        # 1. 协议白名单
         if parsed.scheme not in ("http", "https"):
-            raise ValueError("非法的图片地址，仅支持 HTTP/HTTPS 协议。")
+            raise ValueError("出于安全考虑，仅支持 HTTP/HTTPS 协议的图片地址。")
+
+        # 2. 基础内网与本地地址拦截
+        hostname = parsed.hostname or ""
+        forbidden_hosts = ('localhost', '127.0.0.1', '0.0.0.0')
+        if hostname in forbidden_hosts or hostname.startswith('192.168.') or hostname.startswith(
+                '10.') or hostname.endswith('.local'):
+            raise ValueError("禁止请求内网或本地地址，已拦截潜在的 SSRF 攻击。")
 
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=10) as resp:
-                if resp.status == 200:
-                    with open(path, "wb") as f:
-                        f.write(await resp.read())
-                else:
-                    raise RuntimeError(f"状态码: {resp.status}")
+                if resp.status != 200:
+                    raise RuntimeError(f"网络异常，HTTP状态码: {resp.status}")
+
+                # 3. 流式下载与体积限制 (防范超大文件撑爆内存，例如限制最大 5MB)
+                downloaded_size = 0
+                with open(path, "wb") as f:
+                    async for chunk in resp.content.iter_chunked(8192):
+                        downloaded_size += len(chunk)
+                        if downloaded_size > 20 * 1024 * 1024:  # 5MB
+                            raise ValueError("图片体积过大（超 20MB），防爆内存拦截系统已触发。")
+                        f.write(chunk)
 
     async def delayed_remove(self, filepath: str, delay: int = 15):
         await asyncio.sleep(delay)
@@ -150,160 +165,67 @@ class MemeArsenal(Star):
                 if f_path:
                     asyncio.create_task(self.delayed_remove(f_path))
 
-    # ---------------- 注册的命令列表 ---------------- #
+    # ==========================================
+    # Linus 架构：数据驱动动态注册命令
+    # ==========================================
+    COMMAND_REGISTRY = {
+        "泉此方看": {"ext": "png", "msg": "此方正在看..."},
+        "吸": {"ext": "gif", "msg": "正在发动黑洞..."},
+        "敲": {"ext": "gif", "msg": "当当当！"},
+        "墙纸": {"ext": "gif", "msg": "正在粉刷墙壁..."},
+        "抛": {"ext": "gif", "msg": "用力一扔！"},
+        "拍": {"ext": "gif", "msg": "无影手准备中..."},
+        "拿捏": {"ext": "gif", "msg": "尽在掌控..."},
+        "膜拜": {"ext": "gif", "msg": "大佬受我一拜！"},
+        "卖掉了": {"ext": "png", "msg": "成交！"},
+        "啾啾": {"ext": "gif", "msg": "Mua~"},
+        "紧贴": {"ext": "gif", "msg": "贴住了，贴得死死的！"},
+        "胡桃啃": {"ext": "gif", "msg": "胡桃牙痒痒了..."},
+        "搓": {"ext": "gif", "msg": "正在疯狂揉搓..."},
+        "锤": {"ext": "gif", "msg": "吃我一锤！"},
+        "舔屏": {"ext": "gif", "msg": "嘿嘿嘿..."},
+        "贴贴": {"ext": "gif", "msg": "飞扑贴贴！", "is_double": True},
+        "伽波贴": {"ext": "gif", "msg": "伽波！"},
+        "催眠": {"ext": "gif", "msg": "注入暗示中..."},
+        "打拳": {"ext": "gif", "msg": "欧拉欧拉欧拉！"},
+        "可莉吃": {"ext": "gif", "msg": "可莉开饭啦！"},
+        "跳": {"ext": "gif", "msg": "跳一跳！"},
+        "撸": {"ext": "gif", "msg": "正在加速...", "extra_args": ["1"]},
+        "双手撸": {"script": "撸.py", "ext": "gif", "msg": "双手加速...", "extra_args": ["1"]},
+        "单手撸": {"script": "撸.py", "ext": "gif", "msg": "单手加速...", "extra_args": ["2"]},
+        "射": {"ext": "gif", "msg": "准备击中..."},
+        "垃圾桶": {"ext": "gif", "msg": "回收废品中..."},
+        "顶": {"ext": "gif", "msg": "顶上去！"},
+        "科目三": {"ext": "gif", "msg": "社会摇准备..."},
+        "砸": {"ext": "gif", "msg": "大锤搞定！"},
+        "摸头": {"ext": "gif", "msg": "乖乖，摸摸头..."},
+        "吃": {"ext": "gif", "msg": "阿姆阿姆..."},
+        "草神啃": {"ext": "gif", "msg": "纳西妲也想啃..."},
+        "抱大腿": {"ext": "gif", "msg": "求带飞！"},
+        "飞机杯": {"ext": "gif", "msg": "正在起飞！"},
+        "汤姆嘲笑": {"ext": "gif", "msg": "汤姆正在大笑..."},
+        "字符画": {"ext": "png", "msg": "正在转码..."},
+        "抱抱": {"ext": "gif", "msg": "抱一个~", "is_double": True},
+        "白子舔": {"ext": "gif", "msg": "白子忍不住了..."},
+        "撅": {"ext": "gif", "msg": "小心后面！", "is_double": True}
+    }
 
-    @filter.command("泉此方看")
-    async def cmd_1(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "泉此方看", "泉此方看.py", "png", "此方正在看..."): yield r
+    # 动态元编程：将字典中的配置自动转化为类的命令函数
+    for cmd_name, config in COMMAND_REGISTRY.items():
+        def create_handler(name, cfg):
+            @filter.command(name)
+            async def wrapper(self, event: AstrMessageEvent):
+                script_name = cfg.get("script", f"{name}.py")  # 默认脚本名等于命令名
+                async for r in self._handle(
+                        event, name, script_name,
+                        cfg.get("ext", "gif"), cfg.get("msg", "正在生成..."),
+                        cfg.get("is_double", False), cfg.get("extra_args")
+                ):
+                    yield r
 
-    @filter.command("吸")
-    async def cmd_2(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "吸", "吸.py", "gif", "正在发动黑洞..."): yield r
+            # 赋予唯一标识，防止底层注册器冲突
+            wrapper.__name__ = f"cmd_{uuid.uuid4().hex[:8]}"
+            return wrapper
 
-    @filter.command("敲")
-    async def cmd_3(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "敲", "敲.py", "gif", "当当当！"): yield r
-
-    @filter.command("墙纸")
-    async def cmd_4(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "墙纸", "墙纸.py", "gif", "正在粉刷墙壁..."): yield r
-
-    @filter.command("抛")
-    async def cmd_5(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "抛", "抛.py", "gif", "用力一扔！"): yield r
-
-    @filter.command("拍")
-    async def cmd_6(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "拍", "拍.py", "gif", "无影手准备中..."): yield r
-
-    @filter.command("拿捏")
-    async def cmd_7(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "拿捏", "拿捏.py", "gif", "尽在掌控..."): yield r
-
-    @filter.command("膜拜")
-    async def cmd_8(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "膜拜", "膜拜.py", "gif", "大佬受我一拜！"): yield r
-
-    @filter.command("卖掉了")
-    async def cmd_9(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "卖掉了", "卖掉了.py", "png", "成交！"): yield r
-
-    @filter.command("啾啾")
-    async def cmd_10(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "啾啾", "啾啾.py", "gif", "Mua~"): yield r
-
-    @filter.command("紧贴")
-    async def cmd_11(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "紧贴", "紧贴.py", "gif", "贴住了，贴得死死的！"): yield r
-
-    @filter.command("胡桃啃")
-    async def cmd_12(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "胡桃啃", "胡桃啃.py", "gif", "胡桃牙痒痒了..."): yield r
-
-    @filter.command("搓")
-    async def cmd_13(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "搓", "搓.py", "gif", "正在疯狂揉搓..."): yield r
-
-    @filter.command("锤")
-    async def cmd_14(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "锤", "锤.py", "gif", "吃我一锤！"): yield r
-
-    @filter.command("舔屏")
-    async def cmd_15(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "舔屏", "舔屏.py", "gif", "嘿嘿嘿..."): yield r
-
-    @filter.command("贴贴")
-    async def cmd_16(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "贴贴", "贴贴.py", "gif", "飞扑贴贴！", is_double=True): yield r
-
-    @filter.command("伽波贴")
-    async def cmd_17(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "伽波贴", "伽波贴.py", "gif", "伽波！"): yield r
-
-    @filter.command("催眠")
-    async def cmd_18(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "催眠", "催眠.py", "gif", "注入暗示中..."): yield r
-
-    @filter.command("打拳")
-    async def cmd_19(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "打拳", "打拳.py", "gif", "欧拉欧拉欧拉！"): yield r
-
-    @filter.command("可莉吃")
-    async def cmd_20(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "可莉吃", "可莉吃.py", "gif", "可莉开饭啦！"): yield r
-
-    @filter.command("跳")
-    async def cmd_21(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "跳", "跳.py", "gif", "跳一跳！"): yield r
-
-    @filter.command("撸")
-    async def cmd_22(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "撸", "撸.py", "gif", "正在加速...", extra_args=["1"]): yield r
-
-    @filter.command("双手撸")
-    async def cmd_22_1(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "双手撸", "撸.py", "gif", "双手加速...", extra_args=["1"]): yield r
-
-    @filter.command("单手撸")
-    async def cmd_22_2(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "单手撸", "撸.py", "gif", "单手加速...", extra_args=["2"]): yield r
-
-    @filter.command("射")
-    async def cmd_23(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "射", "射.py", "gif", "准备击中..."): yield r
-
-    @filter.command("垃圾桶")
-    async def cmd_24(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "垃圾桶", "垃圾桶.py", "gif", "回收废品中..."): yield r
-
-    @filter.command("顶")
-    async def cmd_25(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "顶", "顶.py", "gif", "顶上去！"): yield r
-
-    @filter.command("科目三")
-    async def cmd_26(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "科目三", "科目三.py", "gif", "社会摇准备..."): yield r
-
-    @filter.command("砸")
-    async def cmd_27(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "砸", "砸.py", "gif", "大锤搞定！"): yield r
-
-    @filter.command("摸头")
-    async def cmd_28(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "摸头", "摸头.py", "gif", "乖乖，摸摸头..."): yield r
-
-    @filter.command("吃")
-    async def cmd_29(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "吃", "吃.py", "gif", "阿姆阿姆..."): yield r
-
-    @filter.command("草神啃")
-    async def cmd_30(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "草神啃", "草神啃.py", "gif", "纳西妲也想啃..."): yield r
-
-    @filter.command("抱大腿")
-    async def cmd_31(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "抱大腿", "抱大腿.py", "gif", "求带飞！"): yield r
-
-    @filter.command("飞机杯")
-    async def cmd_32(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "飞机杯", "飞机杯.py", "gif", "正在起飞！"): yield r
-
-    @filter.command("汤姆嘲笑")
-    async def cmd_33(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "汤姆嘲笑", "汤姆嘲笑.py", "gif", "汤姆正在大笑..."): yield r
-
-    @filter.command("字符画")
-    async def cmd_34(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "字符画", "字符画.py", "png", "正在转码..."): yield r
-
-    @filter.command("抱抱")
-    async def cmd_35(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "抱抱", "抱抱.py", "gif", "抱一个~", is_double=True): yield r
-
-    @filter.command("白子舔")
-    async def cmd_36(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "白子舔", "白子舔.py", "gif", "白子忍不住了..."): yield r
-
-    @filter.command("撅")
-    async def cmd_37(self, event: AstrMessageEvent):
-        async for r in self._handle(event, "撅", "撅.py", "gif", "小心后面！", is_double=True): yield r
+        # 动态附加到 MemeArsenal 类中
+        setattr(MemeArsenal, f"dynamic_cmd_{cmd_name}", create_handler(cmd_name, config))
