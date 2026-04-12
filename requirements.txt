@@ -1,0 +1,6 @@
+Pillow
+pil-utils
+requests
+numpy
+opencv-python-headless
+meme-generator
