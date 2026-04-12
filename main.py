@@ -4,6 +4,7 @@ import tempfile
 import uuid
 import asyncio
 import aiohttp
+from urllib.parse import urlparse
 from astrbot.api.all import *  # type: ignore
 from astrbot.api.event import filter
 from astrbot.api import logger
@@ -17,50 +18,31 @@ class MemeArsenal(Star):
         self.config = config
         self.plugin_dir = os.path.dirname(os.path.abspath(__file__))
         self.scripts_dir = os.path.join(self.plugin_dir, "scripts")
-
-        # 1. 创建插件专属的临时缓存文件夹
-        self.temp_dir = os.path.join(self.plugin_dir, "temp_cache")
-        os.makedirs(self.temp_dir, exist_ok=True)
-
-        # 2. 每次启动插件时，自动清理之前的垃圾文件，彻底解决硬盘塞满风险
-        self._cleanup_temp_dir()
-
-        # 3. 引入并发控制（最多同时处理 5 个图片生成），防止群友刷屏导致服务器卡死
-        self.semaphore = asyncio.Semaphore(5)
-
-    def _cleanup_temp_dir(self):
-        """清理历史残留的临时文件"""
-        try:
-            for filename in os.listdir(self.temp_dir):
-                filepath = os.path.join(self.temp_dir, filename)
-                if os.path.isfile(filepath):
-                    os.remove(filepath)
-        except Exception as e:
-            logger.error(f"清理临时文件失败: {e}")
+        self.semaphore = asyncio.Semaphore(5)  # 限制最高并发数为5
 
     async def download_image(self, url: str, path: str):
-        """异步下载图片的辅助方法，加入伪装请求头提高成功率"""
+        """异步下载图片的辅助方法，加入基础防SSRF检查"""
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("非法的图片地址，仅支持 HTTP/HTTPS 协议。")
+
         async with aiohttp.ClientSession() as session:
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-            async with session.get(url, headers=headers, timeout=10) as resp:
+            async with session.get(url, timeout=10) as resp:
                 if resp.status == 200:
                     with open(path, "wb") as f:
                         f.write(await resp.read())
                 else:
-                    raise RuntimeError(f"图片下载失败，状态码: {resp.status}")
+                    raise RuntimeError(f"状态码: {resp.status}")
 
-    async def delayed_remove(self, filepath: str, delay: int = 30):
-        """延迟清理临时文件，给框架更宽裕的图片发送时间"""
+    async def delayed_remove(self, filepath: str, delay: int = 15):
         await asyncio.sleep(delay)
-        if filepath and os.path.exists(filepath):
+        if os.path.exists(filepath):
             try:
                 os.remove(filepath)
             except Exception:
                 pass
 
-    async def _handle(self, event: AstrMessageEvent, cmd, script, ext="gif", msg="正在生成...", is_double=False,
-                      extra_args=None):
-        """通用表情包处理逻辑"""
+    async def _handle(self, event, cmd, script, ext="gif", msg="正在生成...", is_double=False, extra_args=None):
         is_enabled = self.config.get(cmd, True)
 
         if is_enabled is False or str(is_enabled).lower() == "false" or is_enabled == 0:
@@ -71,104 +53,102 @@ class MemeArsenal(Star):
 
         for comp in event.message_obj.message:
             if isinstance(comp, Image):
-                target_url = comp.url
+                target_url = comp.url;
                 break
 
         if not target_url and getattr(event.message_obj, 'quote', None):
             for comp in event.message_obj.quote.message:
                 if isinstance(comp, Image):
-                    target_url = comp.url
+                    target_url = comp.url;
                     break
 
         if not target_url:
             for comp in event.message_obj.message:
                 if isinstance(comp, At) and str(comp.qq) != str(event.get_self_id()):
-                    target_url = f"http://q1.qlogo.cn/g?b=qq&nk={comp.qq}&s=640"
+                    target_url = f"http://q1.qlogo.cn/g?b=qq&nk={comp.qq}&s=640";
                     break
 
         if not target_url:
-            sender_id = event.get_sender_id()
-            target_url = f"http://q1.qlogo.cn/g?b=qq&nk={sender_id}&s=640"
+            target_url = f"http://q1.qlogo.cn/g?b=qq&nk={event.get_sender_id()}&s=640"
 
         yield event.plain_result(msg)
 
-        # 所有的处理都在安全的 temp_cache 目录下进行
+        temp_dir = tempfile.gettempdir()
         req_id = uuid.uuid4().hex
-        in_p = os.path.join(self.temp_dir, f"{cmd}_in_{req_id}.png")
-        out_base = os.path.join(self.temp_dir, f"{cmd}_out_{req_id}")
-        sender_p = os.path.join(self.temp_dir, f"sender_{req_id}.png") if is_double else None
+        in_p = os.path.join(temp_dir, f"{cmd}_in_{req_id}.png")
+        out_base = os.path.join(temp_dir, f"{cmd}_out_{req_id}")
+        sender_p = os.path.join(temp_dir, f"sender_{req_id}.png") if is_double else None
 
         files_to_cleanup = [in_p]
 
         try:
-            # 捕获因非 QQ 平台无法获取到头像时的下载错误
-            try:
-                await self.download_image(target_url, in_p)
-            except Exception as e:
-                yield event.plain_result(f"❌ 图片获取失败，请确保您发了图片或在 QQ 平台使用。")
-                return
-
-            args = [sys.executable, os.path.join(self.scripts_dir, script)]
-
-            if is_double:
-                sender_id = event.get_sender_id()
-                sender_url = f"http://q1.qlogo.cn/g?b=qq&nk={sender_id}&s=640"
-                try:
-                    await self.download_image(sender_url, sender_p)
-                except Exception:
-                    pass
-                files_to_cleanup.append(sender_p)
-                args += [sender_p, in_p, out_base + "." + ext]
-            else:
-                args += [in_p, out_base + "." + ext]
-
-            if extra_args:
-                args.extend(extra_args)
-
-            # 核心优化：限制同时运行的脚本数量，不再无脑创建子进程
+            # 【修复】将网络下载阶段也纳入并发控制，防止请求洪峰
             async with self.semaphore:
+                try:
+                    await self.download_image(target_url, in_p)
+                except Exception as e:
+                    yield event.plain_result(f"❌ 目标头像下载失败: {e}")
+                    return
+
+                args = [sys.executable, os.path.join(self.scripts_dir, script)]
+
+                if is_double:
+                    sender_id = event.get_sender_id()
+                    sender_url = f"http://q1.qlogo.cn/g?b=qq&nk={sender_id}&s=640"
+                    try:
+                        # 【修复】如果发送者头像失败，拦截而不是带错执行
+                        await self.download_image(sender_url, sender_p)
+                        files_to_cleanup.append(sender_p)
+                    except Exception as e:
+                        yield event.plain_result(f"❌ 发送者头像下载失败: {e}")
+                        return
+                    args += [sender_p, in_p, out_base + "." + ext]
+                else:
+                    args += [in_p, out_base + "." + ext]
+
+                if extra_args:
+                    args.extend(extra_args)
+
                 process = await asyncio.create_subprocess_exec(
-                    *args,
-                    cwd=self.plugin_dir,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
+                    *args, cwd=self.plugin_dir,
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
                 )
 
                 try:
-                    # 将超时时间延长，避免复杂 GIF 超时
-                    stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=45.0)
+                    stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30.0)
                 except asyncio.TimeoutError:
                     process.kill()
+                    await process.wait()  # 【修复】彻底回收僵尸进程
                     yield event.plain_result("❌ 错误：图片处理超时。")
                     return
 
-            final_out = ""
-            for e in [ext, "gif", "png"]:
-                possible_out = out_base + "." + e
-                if os.path.exists(possible_out):
-                    final_out = possible_out
-                    files_to_cleanup.append(final_out)
-                    break
+                final_out = ""
+                for e in [ext, "gif", "png"]:
+                    possible_out = out_base + "." + e
+                    if os.path.exists(possible_out):
+                        final_out = possible_out
+                        files_to_cleanup.append(final_out)
+                        break
 
-            if process.returncode != 0:
-                err = stderr.decode('utf-8', errors='ignore').strip() or stdout.decode('utf-8', errors='ignore').strip()
-                yield event.plain_result(f"❌ 生成失败：\n{err}")
-            elif final_out:
-                r = event.make_result()
-                r.chain = [Image.fromFileSystem(final_out)]
-                yield r
-            else:
-                yield event.plain_result("❌ 错误：脚本未生成任何文件。")
+                if process.returncode != 0:
+                    err = stderr.decode('utf-8', errors='ignore').strip() or stdout.decode('utf-8',
+                                                                                           errors='ignore').strip()
+                    yield event.plain_result(f"❌ 生成失败：\n{err}")
+                elif final_out:
+                    r = event.make_result()
+                    r.chain = [Image.fromFileSystem(final_out)]
+                    yield r
+                else:
+                    yield event.plain_result("❌ 错误：脚本未生成任何文件。请检查对应素材是否存在。")
 
         except Exception as e:
             logger.error(f"插件逻辑出错: {str(e)}")
-            yield event.plain_result(f"❌ 插件逻辑出错：{str(e)}")
+            yield event.plain_result(f"❌ 插件内部逻辑错误：{str(e)}")
 
         finally:
-            # 加入任务队列延迟清理
             for f_path in files_to_cleanup:
                 if f_path:
-                    asyncio.create_task(self.delayed_remove(f_path, delay=30))
+                    asyncio.create_task(self.delayed_remove(f_path))
 
     # ---------------- 注册的命令列表 ---------------- #
 

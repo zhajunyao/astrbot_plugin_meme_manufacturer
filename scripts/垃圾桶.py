@@ -4,11 +4,11 @@ from pathlib import Path
 from pil_utils import BuildImage
 
 script_dir = Path(__file__).parent.resolve()
-img_dir = script_dir.parent / "data" / "啾啾"
+img_dir = script_dir.parent / "data" / "垃圾桶"  # 【修复】改回正确的垃圾桶目录
 
-def generate_jiujiu(image_path: str, output_path: str):
+def generate_trash(image_path: str, output_path: str): # 【修复】改名
     if not img_dir.exists():
-        raise FileNotFoundError(f"找不到 images 文件夹，请确认它必须放在这个路径下: {img_dir}")
+        raise FileNotFoundError(f"找不到 images 文件夹，请确认路径: {img_dir}")
 
     try:
         user_img = BuildImage.open(image_path).convert("RGBA")
@@ -43,10 +43,13 @@ if __name__ == "__main__":
             input_file = Path(sys.argv[1])
             output_file = Path(sys.argv[2])
             if not input_file.exists():
+                print(f"错误: 文件 {input_file} 不存在！", file=sys.stderr) # 【修复】暴露异常
                 sys.exit(1)
-            generate_jiujiu(str(input_file), str(output_file))
+            generate_trash(str(input_file), str(output_file))
             sys.exit(0)
         else:
+            print("缺少参数！", file=sys.stderr)
             sys.exit(1)
     except Exception as e:
+        print(f"处理失败: {str(e)}", file=sys.stderr) # 【修复】抛出异常给主进程
         sys.exit(1)

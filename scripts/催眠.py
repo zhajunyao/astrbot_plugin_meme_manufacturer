@@ -7,91 +7,61 @@ from pil_utils import BuildImage
 script_dir = Path(__file__).parent.resolve()
 img_dir = script_dir.parent / "data" / "催眠"
 
-
 def generate_saimin(image_path: str, output_path: str):
     if not img_dir.exists():
-        raise FileNotFoundError(f"找不到 images 文件夹，请确认它必须放在这个路径下: {img_dir}")
+        raise FileNotFoundError(f"找不到文件夹: {img_dir}")
 
-    # 加载输入图片
     try:
         input_img = BuildImage.open(image_path)
     except Exception as e:
-        # 💡 核心修改：加上 from e 保留报错堆栈
-        raise RuntimeError(f"无法读取图片文件: {e}") from e
+        raise RuntimeError(f"无法读取图片: {e}") from e
 
-    # 动态获取帧数，免疫缺帧报错
     frame_count = 0
     while (img_dir / f"{frame_count}.png").exists():
         frame_count += 1
 
     if frame_count == 0:
-        raise FileNotFoundError(f"在 {img_dir} 里连一张图片都没找到，请确保有 0.png 等文件！")
+        raise FileNotFoundError(f"在 {img_dir} 缺少帧文件！")
 
     frame_files = [img_dir / f"{i}.png" for i in range(frame_count)]
-
-    # 准备动画参数
     app_w, app_h = BuildImage.open(frame_files[0]).size
     img_w, img_h = input_img.size
-    ratio = 1
 
     # 计算调整尺寸
     if img_w > img_h:
-        frame_h = round(app_h * ratio)
+        frame_h = app_h
         frame_w = round(frame_h * img_w / img_h)
     else:
-        frame_w = round(app_w * ratio)
+        frame_w = app_w
         frame_h = round(frame_w * img_h / img_w)
 
     try:
-        # 生成所有帧
         frames = []
+        # 【修复】将尺寸调整移出循环，防止无意义重复渲染
+        resized = input_img.resize((frame_w, frame_h), keep_ratio=True).convert("RGBA")
+
         for frame_file in frame_files:
-            # 调整输入图片
-            resized = input_img.resize((frame_w, frame_h), keep_ratio=True).convert("RGBA")
-
-            # 创建透明画布
             frame = Image.new("RGBA", (app_w, app_h))
-
-            # 合成图片
             frame.paste(resized.image, (0, app_h - frame_h), resized.image)
             overlay = BuildImage.open(frame_file).convert("RGBA")
             frame.paste(overlay.image, (0, 0), overlay.image)
-
             frames.append(frame)
 
-        # 直接原生保存
         frames[0].save(
-            output_path,
-            format="GIF",
-            save_all=True,
-            append_images=frames[1:],
-            duration=30,
-            loop=0,
-            disposal=2
+            output_path, format="GIF", save_all=True,
+            append_images=frames[1:], duration=30, loop=0, disposal=2
         )
         return True
     except Exception as e:
-        # 💡 统一捕捉处理中的异常并抛出完整堆栈
-        raise RuntimeError(f"动图生成过程中出错: {e}") from e
-
+        raise RuntimeError(f"动图生成出错: {e}") from e
 
 if __name__ == "__main__":
     try:
         if len(sys.argv) >= 3:
-            input_file = Path(sys.argv[1])
-            output_file = Path(sys.argv[2])
-
-            if not input_file.exists():
-                print(f"错误: 文件 {input_file} 不存在！", file=sys.stderr)
-                sys.exit(1)
-
-            generate_saimin(str(input_file), str(output_file))
-            print(f"生成成功！保存路径：{output_file}")
+            generate_saimin(sys.argv[1], sys.argv[2])
             sys.exit(0)
         else:
-            print("缺少参数！", file=sys.stderr)
             sys.exit(1)
-
     except Exception as e:
         print(f"处理失败: {str(e)}", file=sys.stderr)
         sys.exit(1)

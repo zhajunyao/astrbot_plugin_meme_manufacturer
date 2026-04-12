@@ -3,9 +3,9 @@ import sys
 from pathlib import Path
 from PIL import Image
 
-# 💡 核心修改：增加了类型标注
+
 def resize_cover(img: Image.Image, target_size: tuple) -> Image.Image:
-    """保持比例调整图片尺寸，居中裁剪"""
+    """【修复】正确实现的保持比例并居中裁剪(Cover)"""
     img_width, img_height = img.size
     target_width, target_height = target_size
 
@@ -13,15 +13,17 @@ def resize_cover(img: Image.Image, target_size: tuple) -> Image.Image:
     target_ratio = target_width / target_height
 
     if target_ratio > img_ratio:
-        new_height = target_height
-        new_width = int(target_height * img_ratio)
-    else:
         new_width = target_width
         new_height = int(target_width / img_ratio)
+    else:
+        new_height = target_height
+        new_width = int(target_height * img_ratio)
 
     resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-    left = (new_width - target_width) / 2
-    top = (new_height - target_height) / 2
+
+    # 【修复】强制转为 int，防止由于浮点数产生的亚像素异常报错
+    left = int((new_width - target_width) / 2)
+    top = int((new_height - target_height) / 2)
     right = left + target_width
     bottom = top + target_height
 
@@ -33,69 +35,41 @@ def process_image(input_path: str, output_path: str):
     frame_dir = script_dir.parent / "data" / "射"
 
     if not frame_dir.exists():
-        raise FileNotFoundError(f"找不到 images 文件夹，请确认它必须放在这个路径下: {frame_dir}")
+        raise FileNotFoundError(f"找不到文件夹: {frame_dir}")
 
-    frame_files = [frame_dir / f"{i:02d}.png" for i in range(13)]  # 00-12
-
-    # 检查帧文件是否存在
-    for frame_file in frame_files:
-        if not frame_file.exists():
-            raise FileNotFoundError(f"缺少必要的帧文件: {frame_file.name}")
+    frame_files = [frame_dir / f"{i:02d}.png" for i in range(13)]
 
     try:
-        # 💡 核心修改：使用 with 保证输入图片句柄安全释放
         with Image.open(input_path) as raw_user_img:
             user_img = raw_user_img.convert("RGB")
     except Exception as e:
         raise RuntimeError(f"图片加载失败: {e}") from e
 
-    # 处理每一帧
     frames = []
     for frame_file in frame_files:
-        # 💡 核心修改：使用 with 保证每一帧的句柄安全释放
         with Image.open(frame_file) as raw_frame:
             frame = raw_frame.convert("RGBA")
 
-        # 调整用户图片尺寸
         resized_user = resize_cover(user_img, frame.size)
 
-        # 创建合成图像
         composite = Image.new("RGBA", frame.size)
-        composite.paste(resized_user, (0, 0))  # 用户图片作为背景
-        composite.alpha_composite(frame)  # 叠加帧图像
-
-        # 转换为RGB格式
+        composite.paste(resized_user, (0, 0))
+        composite.alpha_composite(frame)
         frames.append(composite.convert("RGB"))
 
-    # 使用原生的 PIL.Image 保存动图
     frames[0].save(
-        output_path,
-        format="GIF",
-        save_all=True,
-        append_images=frames[1:],
-        duration=150,  # 毫秒
-        loop=0,
-        disposal=2
+        output_path, format="GIF", save_all=True,
+        append_images=frames[1:], duration=150, loop=0, disposal=2
     )
 
 
 if __name__ == "__main__":
     try:
         if len(sys.argv) >= 3:
-            input_file = sys.argv[1]
-            output_file = sys.argv[2]
-
-            if not Path(input_file).exists():
-                print(f"错误: 文件 {input_file} 不存在！", file=sys.stderr)
-                sys.exit(1)
-
-            process_image(input_file, output_file)
-            print(f"成功生成GIF文件: {output_file}")
+            process_image(sys.argv[1], sys.argv[2])
             sys.exit(0)
         else:
-            print("缺少参数！", file=sys.stderr)
             sys.exit(1)
-
     except Exception as e:
-        print(f"处理失败: {str(e)}", file=sys.stderr)
+        print(f"处理失败: {str(e)}", file=sys.stderr)  # 暴露错误
         sys.exit(1)
