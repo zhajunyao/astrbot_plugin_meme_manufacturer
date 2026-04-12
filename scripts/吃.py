@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 import sys
 from pathlib import Path
-from PIL.Image import Image as IMG
 from pil_utils import BuildImage
 
 script_dir = Path(__file__).parent.resolve()
-# 💡 这里的 "具体插件名" 必须和 data/ 下的文件夹名字一模一样
 img_dir = script_dir.parent / "data" / "吃"
 
 
@@ -32,25 +30,25 @@ def generate_eat(image_path: str, output_path: str):
             frame.paste(processed_img, (2, 38), below=True)
             frames.append(frame.image)
 
-        # 💡 直接利用原生方法保存为 GIF，抛弃外部依赖库
+        # 直接利用原生方法保存为 GIF
         frames[0].save(
             output_path,
             format="GIF",
             save_all=True,
             append_images=frames[1:],
-            duration=50,  # 0.05秒 = 50毫秒
+            duration=50,
             loop=0,
             disposal=2
         )
         return True
 
     except Exception as e:
-        raise RuntimeError(f"生成失败: {str(e)}")
+        # 💡 核心修改：加上 from e 保留报错堆栈
+        raise RuntimeError(f"生成失败: {str(e)}") from e
 
 
 if __name__ == "__main__":
     try:
-        # 接收外部传入的两个参数：输入图片路径 和 输出GIF路径
         if len(sys.argv) >= 3:
             input_path = Path(sys.argv[1])
             output_path = Path(sys.argv[2])

@@ -3,8 +3,8 @@ import sys
 from pathlib import Path
 from PIL import Image
 
-
-def resize_cover(img, target_size):
+# 💡 核心修改：增加了类型标注
+def resize_cover(img: Image.Image, target_size: tuple) -> Image.Image:
     """保持比例调整图片尺寸，居中裁剪"""
     img_width, img_height = img.size
     target_width, target_height = target_size
@@ -28,10 +28,8 @@ def resize_cover(img, target_size):
     return resized.crop((left, top, right, bottom))
 
 
-def process_image(input_path, output_path):
-    # 💡 核心修复：指向标准的 images 文件夹
+def process_image(input_path: str, output_path: str):
     script_dir = Path(__file__).parent.resolve()
-    # 💡 这里的 "具体插件名" 必须和 data/ 下的文件夹名字一模一样
     frame_dir = script_dir.parent / "data" / "射"
 
     if not frame_dir.exists():
@@ -45,16 +43,18 @@ def process_image(input_path, output_path):
             raise FileNotFoundError(f"缺少必要的帧文件: {frame_file.name}")
 
     try:
-        # 加载用户图片
-        user_img = Image.open(input_path).convert("RGB")
+        # 💡 核心修改：使用 with 保证输入图片句柄安全释放
+        with Image.open(input_path) as raw_user_img:
+            user_img = raw_user_img.convert("RGB")
     except Exception as e:
-        raise RuntimeError(f"图片加载失败: {e}")
+        raise RuntimeError(f"图片加载失败: {e}") from e
 
     # 处理每一帧
     frames = []
     for frame_file in frame_files:
-        # 加载帧并转换为RGBA
-        frame = Image.open(frame_file).convert("RGBA")
+        # 💡 核心修改：使用 with 保证每一帧的句柄安全释放
+        with Image.open(frame_file) as raw_frame:
+            frame = raw_frame.convert("RGBA")
 
         # 调整用户图片尺寸
         resized_user = resize_cover(user_img, frame.size)
@@ -67,7 +67,7 @@ def process_image(input_path, output_path):
         # 转换为RGB格式
         frames.append(composite.convert("RGB"))
 
-    # 💡 核心修复：使用原生的 PIL.Image 保存动图，脱离 imageio 依赖
+    # 使用原生的 PIL.Image 保存动图
     frames[0].save(
         output_path,
         format="GIF",
@@ -81,7 +81,6 @@ def process_image(input_path, output_path):
 
 if __name__ == "__main__":
     try:
-        # 接收外部传入的两个参数：输入图片路径 和 输出GIF路径
         if len(sys.argv) >= 3:
             input_file = sys.argv[1]
             output_file = sys.argv[2]

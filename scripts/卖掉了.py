@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os  # 💡 核心修改：将 os 移动到最顶部
 import sys
 from pathlib import Path
 from PIL import Image, ImageSequence
@@ -35,8 +36,6 @@ def process_frame(frame_img: BuildImage, icon: BuildImage) -> Image.Image:
     return frame.image
 
 
-import os # 确保顶部有 import os
-
 def generate_sold_out(image_path: str, output_path_in: str):
     icon_path = img_dir / "0.png"
     if not icon_path.exists():
@@ -44,7 +43,6 @@ def generate_sold_out(image_path: str, output_path_in: str):
 
     icon = BuildImage.open(icon_path).convert("RGBA")
 
-    # 💡 核心修复：用 os.path.splitext 脱掉 main.py 传过来的后缀外衣，拿到纯正的 base
     output_base = os.path.splitext(output_path_in)[0]
 
     with Image.open(image_path) as im:

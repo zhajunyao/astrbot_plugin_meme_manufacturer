@@ -5,7 +5,6 @@ from PIL import Image
 from pil_utils import BuildImage
 
 script_dir = Path(__file__).parent.resolve()
-# 💡 这里的 "具体插件名" 必须和 data/ 下的文件夹名字一模一样
 img_dir = script_dir.parent / "data" / "催眠"
 
 
@@ -17,9 +16,10 @@ def generate_saimin(image_path: str, output_path: str):
     try:
         input_img = BuildImage.open(image_path)
     except Exception as e:
-        raise RuntimeError(f"无法读取图片文件: {e}")
+        # 💡 核心修改：加上 from e 保留报错堆栈
+        raise RuntimeError(f"无法读取图片文件: {e}") from e
 
-    # 💡 动态获取帧数，免疫缺帧报错
+    # 动态获取帧数，免疫缺帧报错
     frame_count = 0
     while (img_dir / f"{frame_count}.png").exists():
         frame_count += 1
@@ -42,38 +42,41 @@ def generate_saimin(image_path: str, output_path: str):
         frame_w = round(app_w * ratio)
         frame_h = round(frame_w * img_h / img_w)
 
-    # 生成所有帧
-    frames = []
-    for frame_file in frame_files:
-        # 调整输入图片
-        resized = input_img.resize((frame_w, frame_h), keep_ratio=True).convert("RGBA")
+    try:
+        # 生成所有帧
+        frames = []
+        for frame_file in frame_files:
+            # 调整输入图片
+            resized = input_img.resize((frame_w, frame_h), keep_ratio=True).convert("RGBA")
 
-        # 创建透明画布
-        frame = Image.new("RGBA", (app_w, app_h))
+            # 创建透明画布
+            frame = Image.new("RGBA", (app_w, app_h))
 
-        # 合成图片 (底层是输入图，顶层是催眠波纹特效)
-        frame.paste(resized.image, (0, app_h - frame_h), resized.image)
-        overlay = BuildImage.open(frame_file).convert("RGBA")
-        frame.paste(overlay.image, (0, 0), overlay.image)
+            # 合成图片
+            frame.paste(resized.image, (0, app_h - frame_h), resized.image)
+            overlay = BuildImage.open(frame_file).convert("RGBA")
+            frame.paste(overlay.image, (0, 0), overlay.image)
 
-        frames.append(frame)
+            frames.append(frame)
 
-    # 💡 直接原生保存，抛弃所有依赖
-    frames[0].save(
-        output_path,
-        format="GIF",
-        save_all=True,
-        append_images=frames[1:],
-        duration=30,  # 原版为每帧30毫秒，旋转非常快
-        loop=0,
-        disposal=2
-    )
-    return True
+        # 直接原生保存
+        frames[0].save(
+            output_path,
+            format="GIF",
+            save_all=True,
+            append_images=frames[1:],
+            duration=30,
+            loop=0,
+            disposal=2
+        )
+        return True
+    except Exception as e:
+        # 💡 统一捕捉处理中的异常并抛出完整堆栈
+        raise RuntimeError(f"动图生成过程中出错: {e}") from e
 
 
 if __name__ == "__main__":
     try:
-        # 接收外部传入的两个参数：输入图片路径 和 输出GIF路径
         if len(sys.argv) >= 3:
             input_file = Path(sys.argv[1])
             output_file = Path(sys.argv[2])
