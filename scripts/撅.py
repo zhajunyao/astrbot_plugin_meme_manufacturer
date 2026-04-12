@@ -68,17 +68,26 @@ if __name__ == "__main__":
     import traceback
 
     try:
-        # 这里进行你的参数长度判断
-        if len(sys.argv) >= 3:
-            # 调用你的生成函数
-            generate_something(sys.argv[1], sys.argv[2])
+        # 【重点修复1】双人表情包：脚本名 + 发送者路径 + 目标路径 + 输出路径，共 4 个参数
+        if len(sys.argv) >= 4:
+            # sys.argv[1]: 发送者头像 (self_path)
+            # sys.argv[2]: 目标头像 (user_path)
+            # sys.argv[3]: 输出路径 (output_path)
+
+            # 【重点修复2】实例化类并调用 generate_gif 方法
+            generator = DOGenerator()
+            generator.generate_gif(
+                self_path=sys.argv[1],
+                user_path=sys.argv[2],
+                output_path=sys.argv[3]
+            )
             sys.exit(0)
         else:
-            print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)
+            print("错误：参数不足。双人表情需要: sender_path, target_path, output_path", file=sys.stderr)
             sys.exit(1)
 
     except Exception as e:
-        # 【关键】把包含代码行数的详细报错打到标准错误流中，主进程才好收集
+        # 打印详细报错，方便主程序在日志中捕获
         err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
         print(err_msg, file=sys.stderr)
         sys.exit(1)

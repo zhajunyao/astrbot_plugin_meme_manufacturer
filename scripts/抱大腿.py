@@ -49,17 +49,17 @@ if __name__ == "__main__":
     import traceback
 
     try:
-        # 这里进行你的参数长度判断
+        # 这里进行参数长度判断：脚本路径 + 输入路径 + 输出路径，共3个参数
         if len(sys.argv) >= 3:
-            # 调用你的生成函数
-            generate_something(sys.argv[1], sys.argv[2])
+            # 【修复点】：将 generate_something 改为本文件定义的 generate_hug_leg
+            generate_hug_leg(sys.argv[1], sys.argv[2])
             sys.exit(0)
         else:
-            print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)
+            print("错误：传入参数不足，需要 input_img 和 output_path。", file=sys.stderr)
             sys.exit(1)
 
     except Exception as e:
-        # 【关键】把包含代码行数的详细报错打到标准错误流中，主进程才好收集
+        # 打印详细报错到标准错误流，方便主进程收集
         err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
         print(err_msg, file=sys.stderr)
         sys.exit(1)

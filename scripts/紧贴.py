@@ -64,9 +64,9 @@ if __name__ == "__main__":
 
     try:
         # 这里进行你的参数长度判断
-        if len(sys.argv) >= 3:
+        if len(sys.argv) >= 4:
             # 调用你的生成函数
-            generate_something(sys.argv[1], sys.argv[2])
+            generate_tightly(sys.argv[1], sys.argv[2])
             sys.exit(0)
         else:
             print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)

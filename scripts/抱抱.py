@@ -67,17 +67,21 @@ if __name__ == "__main__":
     import traceback
 
     try:
-        # 这里进行你的参数长度判断
-        if len(sys.argv) >= 3:
-            # 调用你的生成函数
-            generate_something(sys.argv[1], sys.argv[2])
+        # 【重点修复1】双人表情包需要接收 2 张图片和 1 个输出路径，所以长度判断应该是 >= 4
+        if len(sys.argv) >= 4:
+            # sys.argv[1] 是发送者(自己)的头像路径
+            # sys.argv[2] 是对方(目标)的头像路径
+            # sys.argv[3] 是输出的 GIF 路径
+
+            # 【重点修复2】调用真正的函数 generate_hug，并按它的要求传入对应参数
+            generate_hug(user_path=sys.argv[2], self_path=sys.argv[1], output_path=sys.argv[3])
             sys.exit(0)
         else:
-            print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)
+            print("错误：传入参数不足，双人表情包需要 sender_img, target_img 和 output 路径。", file=sys.stderr)
             sys.exit(1)
 
     except Exception as e:
-        # 【关键】把包含代码行数的详细报错打到标准错误流中，主进程才好收集
+        # 把包含代码行数的详细报错打到标准错误流中，主进程才好收集
         err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
         print(err_msg, file=sys.stderr)
         sys.exit(1)
