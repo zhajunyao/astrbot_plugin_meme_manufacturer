@@ -64,17 +64,14 @@ def generate_hug(user_path: str, self_path: str, output_path: str):
 
 
 if __name__ == "__main__":
-    import traceback
-
     try:
-        # 【重点修复1】双人表情包需要接收 2 张图片和 1 个输出路径，所以长度判断应该是 >= 4
         if len(sys.argv) >= 4:
-            # sys.argv[1] 是发送者(自己)的头像路径
-            # sys.argv[2] 是对方(目标)的头像路径
-            # sys.argv[3] 是输出的 GIF 路径
+            # 修改参数映射顺序，确保“你”是主动方
+            sender_p = sys.argv[1]  # 发送者头像
+            target_p = sys.argv[2]  # 对方头像
+            out_p = sys.argv[3]     # 输出路径
 
-            # 【重点修复2】调用真正的函数 generate_hug，并按它的要求传入对应参数
-            generate_hug(user_path=sys.argv[2], self_path=sys.argv[1], output_path=sys.argv[3])
+            generate_hug(user_path=target_p, self_path=sender_p, output_path=out_p)
             sys.exit(0)
         else:
             print("错误：传入参数不足，双人表情包需要 sender_img, target_img 和 output 路径。", file=sys.stderr)
