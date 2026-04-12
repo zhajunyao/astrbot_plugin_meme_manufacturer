@@ -1,7 +1,7 @@
-"name": "astrbot_plugin_meme_manufacturer"
-  "display_name": "表情包制造厂"
-  "desc": "将QQ群友头像做成表情包的工具。可以做成gif，也可以做成静态表情，内置多种表情包，水群利器"
-  "author": "神秘嘉宾"
-  "repo": "https://github.com/zhajunyao/astrbot_plugin_meme_manufacturer"
-  "tags": ["娱乐", "表情包", "互动","gif"]
+"name": "astrbot_plugin_meme_manufacturer",
+  "display_name": "表情包制造厂",
+  "desc": "将QQ群友头像做成表情包的工具。可以做成gif，也可以做成静态表情，内置多种表情包，水群利器",
+  "author": "神秘嘉宾",
+  "repo": "https://github.com/zhajunyao/astrbot_plugin_meme_manufacturer",
+  "tags": ["娱乐", "表情包", "互动","gif"],
   "social_link": "https://github.com/zhajunyao"
