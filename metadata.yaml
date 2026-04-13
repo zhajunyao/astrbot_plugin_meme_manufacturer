@@ -1,4 +1,4 @@
-name: "astrbot_plugin_meme_manufacturer"
+name: "表情包制造厂"
 author: "神秘嘉宾"
 version: "1.0.0"
 desc: "将QQ群友头像做成表情包的工具。可以做成gif，也可以做成静态表情，内置多种表情包，水群利器"

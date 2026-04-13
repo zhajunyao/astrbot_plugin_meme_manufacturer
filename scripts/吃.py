@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import sys
 from pathlib import Path
+from PIL.Image import Image as IMG
 from pil_utils import BuildImage
 
 script_dir = Path(__file__).parent.resolve()
+# 💡 这里的 "具体插件名" 必须和 data/ 下的文件夹名字一模一样
 img_dir = script_dir.parent / "data" / "吃"
 
 
@@ -30,38 +32,40 @@ def generate_eat(image_path: str, output_path: str):
             frame.paste(processed_img, (2, 38), below=True)
             frames.append(frame.image)
 
-        # 直接利用原生方法保存为 GIF
+        # 💡 直接利用原生方法保存为 GIF，抛弃外部依赖库
         frames[0].save(
             output_path,
             format="GIF",
             save_all=True,
             append_images=frames[1:],
-            duration=50,
+            duration=50,  # 0.05秒 = 50毫秒
             loop=0,
             disposal=2
         )
         return True
 
     except Exception as e:
-        # 💡 核心修改：加上 from e 保留报错堆栈
-        raise RuntimeError(f"生成失败: {str(e)}") from e
+        raise RuntimeError(f"生成失败: {str(e)}")
 
 
 if __name__ == "__main__":
-    import traceback
-
     try:
-        # 这里进行你的参数长度判断
+        # 接收外部传入的两个参数：输入图片路径 和 输出GIF路径
         if len(sys.argv) >= 3:
-            # 调用你的生成函数
-            generate_eat(sys.argv[1], sys.argv[2])
+            input_path = Path(sys.argv[1])
+            output_path = Path(sys.argv[2])
+
+            if not input_path.exists():
+                print(f"错误: 文件 {input_path} 不存在！", file=sys.stderr)
+                sys.exit(1)
+
+            generate_eat(str(input_path), str(output_path))
+            print(f"生成成功: {output_path}")
             sys.exit(0)
         else:
-            print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)
+            print("缺少参数！", file=sys.stderr)
             sys.exit(1)
 
     except Exception as e:
-        # 【关键】把包含代码行数的详细报错打到标准错误流中，主进程才好收集
-        err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
-        print(err_msg, file=sys.stderr)
+        print(f"处理失败: {str(e)}", file=sys.stderr)
         sys.exit(1)

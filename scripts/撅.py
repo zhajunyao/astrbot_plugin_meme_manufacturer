@@ -65,29 +65,24 @@ class DOGenerator:
 
 
 if __name__ == "__main__":
-    import traceback
-
     try:
-        # 【重点修复1】双人表情包：脚本名 + 发送者路径 + 目标路径 + 输出路径，共 4 个参数
+        # 接收三个参数：主动方路径，被动方路径，输出路径
         if len(sys.argv) >= 4:
-            # sys.argv[1]: 发送者头像 (self_path)
-            # sys.argv[2]: 目标头像 (user_path)
-            # sys.argv[3]: 输出路径 (output_path)
+            sender = sys.argv[1]
+            target = sys.argv[2]
+            output = sys.argv[3]
 
-            # 【重点修复2】实例化类并调用 generate_gif 方法
-            generator = DOGenerator()
-            generator.generate_gif(
-                self_path=sys.argv[1],
-                user_path=sys.argv[2],
-                output_path=sys.argv[3]
-            )
+            if not os.path.exists(sender) or not os.path.exists(target):
+                print("错误: 输入的图片文件不存在！", file=sys.stderr)
+                sys.exit(1)
+
+            gen = DOGenerator()
+            gen.generate_gif(sender, target, output)
+            print(f"生成成功: {output}")
             sys.exit(0)
         else:
-            print("错误：参数不足。双人表情需要: sender_path, target_path, output_path", file=sys.stderr)
+            print("缺少参数！", file=sys.stderr)
             sys.exit(1)
-
     except Exception as e:
-        # 打印详细报错，方便主程序在日志中捕获
-        err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
-        print(err_msg, file=sys.stderr)
+        print(f"脚本处理失败: {str(e)}", file=sys.stderr)
         sys.exit(1)

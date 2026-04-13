@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os  # 💡 核心修改：将 os 移动到最顶部
 import sys
 from pathlib import Path
 from PIL import Image, ImageSequence
@@ -36,6 +35,8 @@ def process_frame(frame_img: BuildImage, icon: BuildImage) -> Image.Image:
     return frame.image
 
 
+import os # 确保顶部有 import os
+
 def generate_sold_out(image_path: str, output_path_in: str):
     icon_path = img_dir / "0.png"
     if not icon_path.exists():
@@ -43,6 +44,7 @@ def generate_sold_out(image_path: str, output_path_in: str):
 
     icon = BuildImage.open(icon_path).convert("RGBA")
 
+    # 💡 核心修复：用 os.path.splitext 脱掉 main.py 传过来的后缀外衣，拿到纯正的 base
     output_base = os.path.splitext(output_path_in)[0]
 
     with Image.open(image_path) as im:
@@ -76,20 +78,12 @@ def generate_sold_out(image_path: str, output_path_in: str):
 
 
 if __name__ == "__main__":
-    import traceback
-
     try:
-        # 这里进行你的参数长度判断
         if len(sys.argv) >= 3:
-            # 调用你的生成函数
             generate_sold_out(sys.argv[1], sys.argv[2])
             sys.exit(0)
         else:
-            print("错误：传入参数不足，需要 input 和 output 路径。", file=sys.stderr)
             sys.exit(1)
-
     except Exception as e:
-        # 【关键】把包含代码行数的详细报错打到标准错误流中，主进程才好收集
-        err_msg = f"图像处理崩溃: {str(e)}\n{traceback.format_exc()}"
-        print(err_msg, file=sys.stderr)
+        print(str(e), file=sys.stderr)
         sys.exit(1)
