@@ -22,8 +22,9 @@ def generate_smash(image_path: str, output_path: str):
 
     user_img = BuildImage.open(image_path)
 
-    # 💡 核心修复：定义处理函数接收单张 BuildImage，配合下方的去列表化传参
-    def make(img: BuildImage) -> BuildImage:
+    # 💡 真正的修复：必须用列表接收，并取出第一张图
+    def make(imgs: list) -> BuildImage:
+        img = imgs[0]
         points = ((1, 237), (826, 1), (832, 508), (160, 732))
         screen = (
             img
@@ -33,8 +34,8 @@ def generate_smash(image_path: str, output_path: str):
         )
         return frame.copy().paste(screen, (-136, -81), below=True)
 
-    # 💡 核心修复：直接传入 user_img，不再用中括号包成列表，防止触发框架报错
-    result = make_jpg_or_gif(user_img, make)
+    # 💡 真正的修复：必须把 user_img 用中括号 [] 包成列表传进去！
+    result = make_jpg_or_gif([user_img], make)
 
     # 保存结果
     if isinstance(result, BuildImage):
